@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <title>捷徑資料夾管理</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#007aff">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/8711/8711968.png">
+  <style>
+    @font-face {
+      font-family: 'Inter';
+      src: url('/fonts/Inter-Regular.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
+    }
+    body {
+      font-family: 'Inter', 'Noto Sans TC', sans-serif;
+      background: #f8f9fa;
+      margin: 0;
+      padding: 30px;
+    }
+    h1 { text-align: center; font-size: 26px; margin-bottom: 30px; color: #333; }
+    .menu, form { display: flex; justify-content: center; gap: 10px; margin-bottom: 20px; }
+    input, select, button { padding: 10px 14px; border-radius: 8px; border: 1px solid #ccc; font-size: 14px; font-family: inherit; }
+    button { background: #007aff; color: white; border: none; transition: background 0.3s; cursor: pointer; }
+    button:hover { background: #005edb; }
+    .folders, .shortcuts-view { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; }
+    .folder-card { background: white; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); width: 220px; padding: 20px; text-align: center; cursor: pointer; position: relative; }
+    .folder-card h3 { margin: 0 0 10px; font-size: 16px; color: #007aff; }
+    .folder-card img { margin-top: 6px; width: 20px; height: 20px; }
+    .folder-actions { position: absolute; top: 8px; right: 10px; display: flex; gap: 5px; }
+    .folder-actions button { background: none; border: none; font-size: 16px; cursor: pointer; color: #999; }
+    .shortcut { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 10px; text-align: center; position: relative; width: 160px; transition: box-shadow 0.2s ease; user-select: none; }
+    .shortcut:hover { box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+    .drag-handle { font-size: 18px; cursor: grab; color: #bbb; }
+    .shortcut img { width: 32px; height: 32px; margin-bottom: 4px; }
+    .shortcut p { font-size: 14px; margin: 0; }
+    .edit-btn, .delete-btn { position: absolute; top: 6px; width: 20px; height: 20px; border: none; font-size: 12px; border-radius: 50%; color: white; display: flex; justify-content: center; align-items: center; line-height: 1; cursor: pointer; }
+    .edit-btn { background: #007aff; right: 32px; }
+    .delete-btn { background: red; right: 8px; }
+    #backBtn { display: none; margin: 0 auto 20px; background: #6c757d; }
+  </style>
+</head>
+<body>
+  <h1>捷徑資料夾管理</h1>
+  <div class="menu"><button id="addFolderBtn">📁 新增資料夾</button></div>
+  <form id="shortcutForm">
+    <input type="text" id="name" placeholder="網站名稱" required>
+    <input type="url" id="url" placeholder="https://example.com" required>
+    <select id="folderSelect"><option value="">（可選）加入資料夾</option></select>
+    <button type="submit">➕ 新增捷徑</button>
+  </form>
+  <button id="backBtn">← 返回資料夾列表</button>
+  <div id="folders" class="folders"></div>
+  <div id="shortcutsView" class="shortcuts-view" style="display:none;"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+  <script>
+    // 完整管理功能 JS 邏輯
+    const foldersDiv = document.getElementById("folders"), shortcutsView = document.getElementById("shortcutsView"), backBtn = document.getElementById("backBtn"), folderSelect = document.getElementById("folderSelect");
+    let currentFolder = null; let data = JSON.parse(localStorage.getItem("shortcutData")) || {}; let unsortedShortcuts = JSON.parse(localStorage.getItem("unsortedShortcuts") || "[]");
+    function saveData(){ localStorage.setItem("shortcutData", JSON.stringify(data)); localStorage.setItem("unsortedShortcuts", JSON.stringify(unsortedShortcuts)); }
+    function updateFolderSelect(){ folderSelect.innerHTML = '<option value="">（可選）加入資料夾</option>'; Object.keys(data).forEach(name=>{ const opt=document.createElement("option"); opt.value = name; opt.textContent = name; folderSelect.appendChild(opt); }); }
+    function renderFolders(){ foldersDiv.innerHTML = ""; shortcutsView.style.display = "none"; foldersDiv.style.display = "flex"; backBtn.style.display = "none"; Object.keys(data).forEach(folderName=>{ const card=document.createElement("div"); card.className="folder-card"; const h3=document.createElement("h3"); h3.textContent=folderName; card.appendChild(h3); if(data[folderName].length){ const img=document.createElement("img"); img.src=`https://www.google.com/s2/favicons?domain=${data[folderName][0].url}&sz=64`; card.appendChild(img); } const actions=document.createElement("div"); actions.className="folder-actions"; const edit=document.createElement("button"); edit.textContent="✏️"; edit.onclick=e=>{ e.stopPropagation(); const newName=prompt("重新命名資料夾", folderName); if(newName && !data[newName]){ data[newName] = data[folderName]; delete data[folderName]; saveData(); renderFolders(); updateFolderSelect(); }}; const del=document.createElement("button"); del.textContent="🗑️"; del.onclick=e=>{ e.stopPropagation(); if(confirm(`確定刪除「${folderName}」以及裡面的捷徑嗎？`)){ delete data[folderName]; saveData(); renderFolders(); updateFolderSelect(); }}; actions.appendChild(edit); actions.appendChild(del); card.appendChild(actions); card.onclick=()=>openFolder(folderName); foldersDiv.appendChild(card); }); }
+    function openFolder(folderName){ currentFolder=folderName; shortcutsView.innerHTML=""; foldersDiv.style.display = "none"; shortcutsView.style.display = "flex"; backBtn.style.display = "block"; data[folderName].forEach((sc, idx)=>{ const div=document.createElement("div"); div.className="shortcut"; const drag=document.createElement("div"); drag.className="drag-handle"; drag.textContent="⠿"; div.appendChild(drag); const img=document.createElement("img"); img.src=`https://www.google.com/s2/favicons?domain=${sc.url}&sz=64`; img.onerror=()=>img.remove(); div.appendChild(img); const p=document.createElement("p"); p.textContent=sc.name; div.appendChild(p); const editBtn=document.createElement("button"); editBtn.className="edit-btn"; editBtn.textContent="✏️"; editBtn.onclick=e=>{ e.stopPropagation(); const nn=prompt("新名稱", sc.name); const nu=prompt("新網址", sc.url); if(nn && nu){ data[folderName][idx]={name:nn.trim(), url:nu.trim()}; saveData(); openFolder(folderName); }}; div.appendChild(editBtn); const delBtn=document.createElement("button"); delBtn.className="delete-btn"; delBtn.textContent="×"; delBtn.onclick=e=>{ e.stopPropagation(); if(confirm(`刪除捷徑「${sc.name}」？`)){ data[folderName].splice(idx,1); saveData(); openFolder(folderName); }}; div.appendChild(delBtn); div.onclick=e=>{ if(e.target===editBtn||e.target===delBtn) return; window.open(sc.url, '_blank'); }; shortcutsView.appendChild(div); }); new Sortable(shortcutsView,{ group:'shared', animation:150, handle:'.drag-handle', onUpdate:evt=>{ const moved=data[folderName].splice(evt.oldIndex,1)[0]; data[folderName].splice(evt.newIndex,0,moved); saveData(); }}); }
+    document.getElementById("addFolderBtn").onclick=()=>{ const fname=prompt("輸入新資料夾名稱"); if(fname && !data[fname]){ data[fname]=[]; saveData(); renderFolders(); updateFolderSelect(); } else alert("資料夾已存在或名稱無效"); };
+    document.getElementById("shortcutForm").onsubmit=e=>{ e.preventDefault(); const name=document.getElementById("name").value.trim(); const url=document.getElementById("url").value.trim(); const folder=folderSelect.value; if(!name||!url){ alert("請輸入名稱與網址"); return; } const shortcut={name, url}; if(folder) data[folder].push(shortcut); else unsortedShortcuts.push(shortcut); saveData(); e.target.reset(); renderFolders(); };
+    backBtn.onclick=()=>{ currentFolder = null; renderFolders(); };
+    renderFolders(); updateFolderSelect();
+  </script>
+</body>
+</html>
